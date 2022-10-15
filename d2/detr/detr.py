@@ -58,9 +58,9 @@ class MaskedBackbone(nn.Module):
             masks_per_feature_level = torch.ones((N, H, W), dtype=torch.bool, device=device)
             for img_idx, (h, w) in enumerate(image_sizes):
                 masks_per_feature_level[
-                    img_idx,
-                    : int(np.ceil(float(h) / self.feature_strides[idx])),
-                    : int(np.ceil(float(w) / self.feature_strides[idx])),
+                img_idx,
+                : int(np.ceil(float(h) / self.feature_strides[idx])),
+                : int(np.ceil(float(w) / self.feature_strides[idx])),
                 ] = 0
             masks.append(masks_per_feature_level)
         return masks
@@ -234,7 +234,7 @@ class Detr(nn.Module):
         scores, labels = F.softmax(box_cls, dim=-1)[:, :, :-1].max(-1)
 
         for i, (scores_per_image, labels_per_image, box_pred_per_image, image_size) in enumerate(zip(
-            scores, labels, box_pred, image_sizes
+                scores, labels, box_pred, image_sizes
         )):
             result = Instances(image_size)
             result.pred_boxes = Boxes(box_cxcywh_to_xyxy(box_pred_per_image))

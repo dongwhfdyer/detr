@@ -19,6 +19,7 @@ from torch import Tensor
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 import torchvision
+
 if version.parse(torchvision.__version__) < version.parse('0.7'):
     from torchvision.ops import _new_empty_tensor
     from torchvision.ops.misc import _output_size
@@ -251,6 +252,7 @@ def get_sha():
 
     def _run(command):
         return subprocess.check_output(command, cwd=cwd).decode('ascii').strip()
+
     sha = 'N/A'
     diff = "clean"
     branch = 'N/A'

@@ -214,6 +214,7 @@ class RandomSelect(object):
     Randomly selects between transforms1 and transforms2,
     with probability p for transforms1 and (1 - p) for transforms2
     """
+
     def __init__(self, transforms1, transforms2, p=0.5):
         self.transforms1 = transforms1
         self.transforms2 = transforms2

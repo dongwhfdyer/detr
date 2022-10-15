@@ -65,7 +65,7 @@ class HungarianMatcher(nn.Module):
         # Compute the classification cost. Contrary to the loss, we don't use the NLL,
         # but approximate it in 1 - proba[target class].
         # The 1 is a constant that doesn't change the matching, it can be ommitted.
-        cost_class = -out_prob[:, tgt_ids]
+        cost_class = -out_prob[:, tgt_ids]  # Kuhn: Because we hope the target_id column is as close to 1 as possible.
 
         # Compute the L1 cost between boxes
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
@@ -75,7 +75,7 @@ class HungarianMatcher(nn.Module):
 
         # Final cost matrix
         C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
-        C = C.view(bs, num_queries, -1).cpu()
+        C = C.view(bs, num_queries, -1).cpu()  # kuhn: why
 
         sizes = [len(v["boxes"]) for v in targets]
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]

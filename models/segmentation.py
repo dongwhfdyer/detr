@@ -275,7 +275,7 @@ class PostProcessPanoptic(nn.Module):
             return tuple(tup.cpu().tolist())
 
         for cur_logits, cur_masks, cur_boxes, size, target_size in zip(
-            out_logits, raw_masks, raw_boxes, processed_sizes, target_sizes
+                out_logits, raw_masks, raw_boxes, processed_sizes, target_sizes
         ):
             # we filter empty queries and detection below threshold
             scores, labels = cur_logits.softmax(-1).max(-1)
