@@ -21,10 +21,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.prepare = ConvertCocoPolysToMask(return_masks)
 
     def __getitem__(self, idx):
-        img, target = super(CocoDetection, self).__getitem__(idx)
+        img, target = super(CocoDetection, self).__getitem__(idx)  # img: PIL.Image, target: segmentations list
         image_id = self.ids[idx]
         target = {'image_id': image_id, 'annotations': target}
-        img, target = self.prepare(img, target)
+        img, target = self.prepare(img, target)  # img: PIL.Image, target: {"boxes": , "labels": , "image_ids":, "area":, "orig_size": }
         if self._transforms is not None:
             img, target = self._transforms(img, target)
         return img, target
@@ -64,19 +64,19 @@ class ConvertCocoPolysToMask(object):
         boxes = [obj["bbox"] for obj in anno]
         # guard against no boxes via resizing
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
-        boxes[:, 2:] += boxes[:, :2]
-        boxes[:, 0::2].clamp_(min=0, max=w)
-        boxes[:, 1::2].clamp_(min=0, max=h)
+        boxes[:, 2:] += boxes[:, :2] # xywh to xyxy
+        boxes[:, 0::2].clamp_(min=0, max=w) # if x1 > w, x1 = w
+        boxes[:, 1::2].clamp_(min=0, max=h) # if y1 > h, y1 = h
 
         classes = [obj["category_id"] for obj in anno]
         classes = torch.tensor(classes, dtype=torch.int64)
 
-        if self.return_masks:
+        if self.return_masks:  # False
             segmentations = [obj["segmentation"] for obj in anno]
             masks = convert_coco_poly_to_mask(segmentations, h, w)
 
         keypoints = None
-        if anno and "keypoints" in anno[0]:
+        if anno and "keypoints" in anno[0]:  # False
             keypoints = [obj["keypoints"] for obj in anno]
             keypoints = torch.as_tensor(keypoints, dtype=torch.float32)
             num_keypoints = keypoints.shape[0]
@@ -153,5 +153,5 @@ def build(image_set, args):
     }
 
     img_folder, ann_file = PATHS[image_set]
-    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set), return_masks=args.masks)
+    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set), return_masks=args.masks)  # args.masks default is False
     return dataset

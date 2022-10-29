@@ -56,6 +56,10 @@ class FrozenBatchNorm2d(torch.nn.Module):
 
 
 class BackboneBase(nn.Module):
+    """
+    Extract features from resnet50 network.
+    kuhn edited
+    """
 
     def __init__(self, backbone: nn.Module, train_backbone: bool, num_channels: int, return_interm_layers: bool):
         super().__init__()
@@ -64,19 +68,28 @@ class BackboneBase(nn.Module):
                 parameter.requires_grad_(False)
         if return_interm_layers:
             return_layers = {"layer1": "0", "layer2": "1", "layer3": "2", "layer4": "3"}
-        else:
+        else:  # True
             return_layers = {'layer4': "0"}
         self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.num_channels = num_channels
 
     def forward(self, tensor_list: NestedTensor):
-        xs = self.body(tensor_list.tensors)
+        xs = self.body(tensor_list.tensors)  # get layer4's output. shape: [bs, 2048, 24, 32]
         out: Dict[str, NestedTensor] = {}
         for name, x in xs.items():
             m = tensor_list.mask
             assert m is not None
+            # m[None].float(): (bs, 768, 1024) -> (1, bs, 768, 1024) true or false tensor -> 0 or 1 tensor
+            # interpolate: (1, bs, 768, 1024) -> (1, bs, 24, 32). Actually, it's a downsample.
+            # to(torch.bool)[0]: (1, bs, 24, 32) -> (bs, 24, 32). 0 or 1 tensor -> true or false tensor
+            # What surprised me is that, m is tensor of True and False.
+            # # ---------kkuhn-block------------------------------ kuhn: only for testing
+            # dd = m[None].float()
+            # ddd = F.interpolate(dd, size=x.shape[-2:])
+            # # ---------kkuhn-block------------------------------
             mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
-            out[name] = NestedTensor(x, mask)
+            out[name] = NestedTensor(x, mask)  # NestedTensor: (bs, 2048,featw, feath), (bs, featw, feath). maybe featw, feath = 24, 32
+        # out: {'0': NestedTensor(tensors=, mask=)}. 0 means layer4
         return out
 
 
@@ -99,18 +112,23 @@ class Joiner(nn.Sequential):
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list: NestedTensor):
-        xs = self[0](tensor_list)
+        xs = self[0](tensor_list)  # self[0]: backbone
         out: List[NestedTensor] = []
         pos = []
+        # xs:{'0': NestedTensor(tensors=, mask=)} 0 means layer4.
+        # NestedTensor: (bs, 2048, feath, featw), (bs, feath, featw)
         for name, x in xs.items():
             out.append(x)
             # position encoding
-            pos.append(self[1](x).to(x.tensors.dtype))
+            pos.append(self[1](x).to(x.tensors.dtype))  # self[1]: position_embedding
 
+        # out: [NestedTensor(tensors=, mask=)]
+        # pos: [NestedTensor(tensors=, mask=)]
         return out, pos
 
 
 def build_backbone(args):
+    # default resnet50
     position_embedding = build_position_encoding(args)
     train_backbone = args.lr_backbone > 0
     return_interm_layers = args.masks

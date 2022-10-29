@@ -36,14 +36,14 @@ class DETR(nn.Module):
         self.transformer = transformer
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)  # 4 is the number of coordinates
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
         self.aux_loss = aux_loss
 
     def forward(self, samples: NestedTensor):
-        """The forward expects a NestedTensor, which consists of:
+        """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
 
@@ -59,26 +59,16 @@ class DETR(nn.Module):
         """
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
-        # kuhn edited.
-        # features: NestedTensor:{"Tensors":, "mask":}
-        # features.tensors: (batch_size, 3, H, W) -> (batch_size, num_channels, featH, featW) num_channels default 2048
-        # features.mask: (batch_size, H, W) -> (batch_size, featH, featW)
-        # pos: (bs, 256, featH, featW)
         features, pos = self.backbone(samples)
 
         src, mask = features[-1].decompose()
         assert mask is not None
-        # # ---------kkuhn-block------------------------------ kuhn: only for testing
-        # dd = self.input_proj(src)
-        # # ---------kkuhn-block------------------------------
-        # input_proj(conv2d kernelSize=1 stride=1): (bs, num_channels, featH, featW) -> (batch_size, d_model, featH, featW)
-        # transformer: (batch_size, d_model, featH, featW) -> [layerNum, bs, num_queries, d_model]
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
 
-        outputs_class = self.class_embed(hs) # [layerNum, bs, num_queries, num_classes + 1]
-        outputs_coord = self.bbox_embed(hs).sigmoid() # [layerNum, bs, num_queries, 4]
-        out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]} # get the last layer's output
-        if self.aux_loss: # True
+        outputs_class = self.class_embed(hs)
+        outputs_coord = self.bbox_embed(hs).sigmoid()
+        out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
+        if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
 
@@ -302,7 +292,6 @@ class PostProcess(nn.Module):
 class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""
 
-    # default input arguments: [transformer.d_model, transformer.d_model, number of coordinates, 3]
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super().__init__()
         self.num_layers = num_layers
@@ -316,25 +305,10 @@ class MLP(nn.Module):
 
 
 def build(args):
-    # the `num_classes` naming here is somewhat misleading.
-    # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
-    # is the maximum id for a class in your dataset. For example,
-    # COCO has a max_obj_id of 90, so we pass `num_classes` to be 91.
-    # As another example, for a dataset that has a single class with id 1,
-    # you should pass `num_classes` to be 2 (max_obj_id + 1).
-    # For more details on this, check the following discussion
-    # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
     num_classes = 20 if args.dataset_file != 'coco' else 91
-    if args.dataset_file == "coco_panoptic":
-        # for panoptic, we just add a num_classes that is large enough to hold
-        # max_obj_id + 1, but the exact value doesn't really matter
-        num_classes = 250
     device = torch.device(args.device)
-
     backbone = build_backbone(args)
-
     transformer = build_transformer(args)
-
     model = DETR(
         backbone,
         transformer,

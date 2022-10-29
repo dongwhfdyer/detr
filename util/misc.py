@@ -269,6 +269,13 @@ def get_sha():
 
 
 def collate_fn(batch):
+    """
+    Firstly, it seperates the batch into tensors and targets.
+    Secondly, it pads the images into the biggest size, creates the corresponding masks for the tensors.
+    Thirdly, packed them using NestedTensor.
+    Finally, it returns the tensors, masks and targets.
+    kuhn edited.
+    """
     batch = list(zip(*batch))
     batch[0] = nested_tensor_from_tensor_list(batch[0])
     return tuple(batch)
@@ -307,8 +314,14 @@ class NestedTensor(object):
 
 
 def nested_tensor_from_tensor_list(tensor_list: List[Tensor]):
+    """
+    This function takes a list of tensors. Firstly, it gets the maximum size of images in the list.
+    Secondly, it creates a tensor of size (len(tensor_list), 3, max_size[0], max_size[1]) named pad_img.
+    Thridly, it copies the images into the pad_image tensor and creates a mask tensor of the same size.
+    kuhn edited
+    """
     # TODO make this more general
-    if tensor_list[0].ndim == 3:
+    if tensor_list[0].ndim == 3:  # (C, H, W)
         if torchvision._is_tracing():
             # nested_tensor_from_tensor_list() does not export well to ONNX
             # call _onnx_nested_tensor_from_tensor_list() instead

@@ -26,10 +26,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print_freq = 10
 
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
-        samples = samples.to(device)
+        samples = samples.to(device) # samples: {"mask":shape[bs,768,1024],"tensors":shape[bs,3,768,1024]}
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        outputs = model(samples)
+        outputs = model(samples) # NestedTensor: e.g. (tensors:shape[bs,3,max_h,max_w], masks:shape[bs,max_h,max_w])
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
